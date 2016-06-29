@@ -1,23 +1,68 @@
+sudo: true
+dist: trusty
+language: cpp
+# run on new infrastructure
+cache: apt
+deploy:
+  provider: releases
+  api_key: $ACCESS_TOKEN
+  file:
+  - "riscv-gnu-toolchain.tar.bz2"
+  skip_cleanup: true
+  on:
+    tags: true
+before_script:
+- if [ -d Bluespec-2015.09.beta2 ] ; then echo bluespec cached; else curl http://www.bluespec.com/downloads/Bluespec-2015.09.beta2.tar.gz | tar -zxf - ; fi
+- mkdir -p lib
+- ln -s /usr/lib/x86_64-linux-gnu/libgmp.so.10 lib/libgmp.so.3
+env:
+  global:
+    - RISCV="/home/travis/riscv_install"
+    - BLUESPECDIR=$PWD/Bluespec-2015.09.beta2/lib
+    - PATH=$PATH:$PWD/Bluespec-2015.09.beta2/bin
+    - LD_LIBRARY_PATH=$PWD/lib
+  matrix:
+    - CONNECTAL_TEST=examples/echo CONNECTAL_ARCH=verilator
+# required packages to install
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
       - autoconf
       - automake
       - autotools-dev
-      - bc
       - bison
       - build-essential
-      - curl
       - flex
+      - g++-4.9
       - gawk
+      - gcc-4.9
       - gperf
       - libgmp-dev
+      - libjsoncpp-dev
       - libmpc-dev
       - libmpfr-dev
-      - libtool
-      - patchutils
+      - linux-headers-generic
+      - python-dev
+      - python-ply
       - texinfo
-install: true
+      - verilator
+
+before_install:
+  # make install destination
+  - mkdir -p $RISCV
+  # use gcc 4.9
+  - export CXX=g++-4.9 CC=gcc-4.9
+
+# extra time duing long builds
+install: travis_wait
+
 script:
-  - ./configure --prefix=/tmp/build-default
-  - make
+- export RISCV=$PWD/riscv
+- mkdir build
+- cd build
+- ../configure --prefix=$RISCV/riscv64 --enable-linux --disable-multilib --with-xlen=64 --with-arch=IMAFD
+- make -j2
+- make install
+- tar -jcf riscv-tools.tar.bz2 riscv
